@@ -1,0 +1,23 @@
+<template>
+    <lightning-card title="Range Selector">
+        <div class="slds-grid slds-gutters">
+            <div class="slds-col slds-m-left_large">
+                <lightning-input type="date" name="startDate" class="startDate" label="From" value={startDate} onchange={handleDateChange} disabled={disabledDate} required></lightning-input>
+                <lightning-button label="Reset All" onclick={handleResetAll} class="slds-size_1-of-6"></lightning-button>
+            </div>
+            <div class="slds-col slds-m-right_large">
+                <lightning-input type="date" name="endDate" class="endDate" label="To" value={endDate} onchange={handleDateChange} required></lightning-input>
+            </div>
+        </div>
+        <div class="slds-grid slds-gutters">
+            <div class="slds-col slds-m-left_large">
+                <div class="slds-text-color_error slds-p-top_medium">
+                    Days Range : {range}
+                </div>
+            </div>
+        </div>
+    </lightning-card>                    
+    <!-- <lightning-card title = "Calendar">
+        <c-show-calendar></c-show-calendar>
+    </lightning-card> -->
+</template>
