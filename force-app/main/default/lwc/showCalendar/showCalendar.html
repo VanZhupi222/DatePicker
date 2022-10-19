@@ -1,0 +1,166 @@
+<template>
+    <div class="wholeDiv">
+        <!--create a lightning card, and put everything in it-->
+        <lightning-card class="lightningCard">
+            <div class="slds-form-element slds-dropdown-trigger slds-dropdown-trigger_click slds-is-open secondDiv">
+                <!--set a label for the card and set it required-->
+                <label class="slds-form-element__label" for="date-input-id-default">
+                    <abbr class="slds-required" title="required">{requiredIcon}</abbr>
+                    {dateStartOrEnd}
+                </label>
+                <div class="slds-form-element__control slds-input-has-icon slds-input-has-icon_right thirdDiv">
+                    <!--create an input box and show selected date-->
+                    <input
+                        type="text"
+                        id="date-input-id-default"
+                        placeholder="Please select a date.."
+                        class="slds-input inputBox"
+                        name="startDate"
+                        value={showDate}
+                        onclick={inputClickHandler}
+                        onchange={handleDateChange}
+                        required
+                        readonly
+                    />
+                    <!--create a lightning button icon to decorate the input box-->
+                    <lightning-button-icon
+                        class="slds-button slds-button_icon slds-input__icon slds-input__icon_right showCalendarButton"
+                        title="Select a date"
+                        size="small"
+                        onclick={inputClickHandler}
+                        icon-name="utility:date_input"
+                        alternative-text="Select a date"
+                    >
+                    </lightning-button-icon>
+                </div>
+                <div
+                    aria-hidden="false"
+                    aria-label="Date picker"
+                    name="datePicker"
+                    class="slds-datepicker slds-dropdown slds-dropdown_left"
+                    role="dialog"
+                    style="display: none;"
+                >
+                    <div class="slds-datepicker__filter slds-grid">
+                        <div class="slds-datepicker__filter_month slds-grid slds-grid_align-spread slds-grow">
+                            <div class="slds-align-middle">
+                                <!--previous month button-->
+                                <button class="slds-button slds-button_icon slds-button_icon-container prev" title="Previous Month" onclick={clickPreviousButton}>
+                                    {iconLeft}
+                                    <span class="slds-assistive-text">{prevMonthTitle}</span>
+                                </button>
+                            </div>
+                            <h2 aria-atomic="true" aria-live="assertive" class="slds-align-middle" id="defaultPicker-month">{showMonth}</h2>
+                            <div class="slds-align-middle">
+                                <!--next month button-->
+                                <button class="slds-button slds-button_icon slds-button_icon-container next" title="Next Month" onclick={clickNextButton}>
+                                    {iconRight}
+                                    <span class="slds-assistive-text">{nextMonthTitle}</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="slds-shrink-none">
+                            <label class="slds-assistive-text" for="defaultPicker_select"></label>
+                            <div class="slds-select_container">
+                                <!--drop down window to choose year-->
+                                <select class="slds-select" id="defaultPicker_select" name="yearSelector" onchange={selectorChangeHandler}>
+                                    <option value={item.value} for:each={options} for:item="item" key={item.label}>{item.label}</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <table aria-labelledby="defaultPicker-month" aria-multiselectable="true" class="slds-datepicker__month" role="grid">
+                        <thead>
+                            <tr id="rangeDefault_start-weekdays">
+                                <!--for each loop to show day of the week-->
+                                <th scope="col" class="dayOfTheWeek" for:each={dayOfTheWeekCol} for:item="item" key={item.index}>
+                                    <abbr title={item.value}>{item.label}</abbr>
+                                </th>
+                            </tr>
+                        </thead>
+                    </table>
+                    <table class="calendarTable">
+                        <!--for each loop to show main calendar-->
+                        <!--conditional rendering-->
+                        <!--show start date-->
+                        <template for:each={outputDays} for:item="item" if:false={item.isEndDate}>
+                            <tr key={item.index} class="slds-col slds-grid calendarCell">
+                                <!--conditional rendering-->
+                                <!--if not disabled-->
+                                <template for:each={item.items} for:item="childItem" if:false={childItem.disabled}>
+                                    <td
+                                        key={childItem.label}
+                                        class={childItem.classChange}
+                                        
+                                        data-datestring={childItem.dateString}
+                                        data-datestatus={childItem.status}
+                                        onclick={datePickHandler}
+                                        title={childItem.holidayName}
+                                        role="gridcell"
+                                    >
+                                        {childItem.label}
+                                    </td>
+                                </template>
+                                <!--if disabled-->
+                                <template for:each={item.items} for:item="childItem" if:true={childItem.disabled}>
+                                    <td
+                                        key={childItem.label}
+                                        class={childItem.classChange}
+                                        
+                                        data-datestring={childItem.dateString}
+                                        data-datestatus={childItem.status}
+                                        onclick={datePickHandler}
+                                        title={childItem.holidayName}
+                                        role="gridcell"
+                                    >
+                                        {childItem.label}
+                                    </td>
+                                </template>
+                            </tr>
+                        </template>
+                        <!--show end date-->
+                        <template for:each={outputDays} for:item="item" if:true={item.isEndDate}>
+                            <tr key={item.index} class="slds-col slds-grid calendarCell">
+                                <!--conditional rendering-->
+                                <!--if disabled-->
+                                <template for:each={item.items} for:item="childItem" if:true={childItem.disabled}>
+                                    <td
+                                        key={childItem.label}
+                                        class={childItem.classChange}
+                                        
+                                        data-datestring={childItem.dateString}
+                                        data-datestatus={childItem.status}
+                                        onclick={datePickHandler}
+                                        title={childItem.holidayName}
+                                        role="gridcell"
+                                    >
+                                        {childItem.label}
+                                    </td>
+                                </template>
+                                <!--if not disabled-->
+                                <template for:each={item.items} for:item="childItem" if:false={childItem.disabled}>
+                                    <td
+                                        key={childItem.label}
+                                        class={childItem.classChange}
+                                        
+                                        data-datestring={childItem.dateString}
+                                        data-datestatus={childItem.status}
+                                        onclick={datePickHandler}
+                                        title={childItem.holidayName}
+                                        role="gridcell"
+                                    >
+                                        {childItem.label}
+                                    </td>
+                                </template>
+                            </tr>
+                        </template>
+                    </table>
+                    <!--today button to return initial page-->
+                    <button class="slds-button slds-align_absolute-center slds-text-link" onclick={todayClickHandler}>Today</button>
+                </div>
+            </div>
+        </lightning-card>
+        <!--reset button to initialize every input box-->
+        <lightning-button label="Reset" onclick={handleResetClick} class="slds-size_1-of-6 slds-align_absolute-center"> </lightning-button>
+    </div>
+</template>

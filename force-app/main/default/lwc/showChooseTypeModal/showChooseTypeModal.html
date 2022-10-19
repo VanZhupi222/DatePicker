@@ -1,0 +1,8 @@
+<template>
+    <lightning-modal-header label="Choose your leave type"></lightning-modal-header>
+    <lightning-modal-body>
+        <template for:each={optionsToChooseLeaveType} for:item="option">
+            <lightning-button onclick={handleOptionChoose} data-id={option.id} key={option.id} label={option.label} class="typeButton"> </lightning-button>
+        </template>
+    </lightning-modal-body>
+</template>

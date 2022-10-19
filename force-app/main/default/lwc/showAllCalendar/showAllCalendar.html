@@ -1,0 +1,10 @@
+<template>
+    <span style="display: inline-block" class="startDate">
+        <c-show-calendar onshowstartdate={startDateChangeHandler} date-to-end={endDate}></c-show-calendar>
+    </span>
+    <span style="display: inline-block" class="startDate">
+        <c-show-calendar onshowenddate={endDateChangeHandler} date-to-start={startDate}></c-show-calendar>
+    </span>
+    <lightning-button style="display: block" label="Calculate" onclick={handleAlertClick} class="slds-size_1-of-6 calculateButton"></lightning-button>
+    <lightning-button style="display: inline-block" label="Confirm" onclick={handleConfirmButton} class="slds-size_1-of-6 confirmButton"></lightning-button>
+</template>
