@@ -1,0 +1,25 @@
+.calculateButton {
+    margin-left: 35%;
+    background: white;
+    color: dodgerblue;
+    width: 75px;
+}
+
+.confirmButton {
+    margin-right: 35%;
+    background: white;
+    color: dodgerblue;
+    width: 75px;
+}
+
+.startDate {
+    margin-left: 10%;
+    margin-right: 10%;
+    width: 30%;
+}
+
+.endDate {
+    margin-left: 10%;
+    margin-right: 10%;
+    width: 30%;
+}

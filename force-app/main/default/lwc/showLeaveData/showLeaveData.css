@@ -1,0 +1,17 @@
+.notCurrentUserClass {
+    color: gray;
+    cursor: default;
+}
+
+.currentUserClass {
+    color: dodgerblue;
+    cursor: pointer;
+}
+
+.actualRange {
+    text-align: center;
+}
+
+.workdayRange {
+    text-align: center;
+}

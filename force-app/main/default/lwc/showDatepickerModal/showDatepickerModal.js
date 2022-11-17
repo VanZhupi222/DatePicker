@@ -1,14 +1,18 @@
-import { LightningElement, track, wire } from 'lwc';
+import LightningModal from 'lightning/modal';
+import { track, api, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import LightningAlert from 'lightning/alert';
-import insertLeaveDate from '@salesforce/apex/DatePickerController.insertLeaveDate';
+import updateLeaveDate from '@salesforce/apex/DatePickerController.updateLeaveDate';
 import getDateForLeave from '@salesforce/apex/DatePickerController.getDateForLeave';
 import LightningConfirm from 'lightning/confirm';
 import showChooseTypeModal from 'c/showChooseTypeModal';
 import currentUser from '@salesforce/user/Id';
 import { publish, MessageContext } from 'lightning/messageService';
 import For_Leave_Updated_CHANNEL from '@salesforce/messageChannel/For_Leave_Updated__c';
-export default class ShowAllCalendar extends LightningElement {
+
+export default class ShowDatepickerModal extends LightningModal {
+    @api
+    dateNeedToBeUpdated = {};
     @track
     startDate;
     @track
@@ -19,10 +23,24 @@ export default class ShowAllCalendar extends LightningElement {
     workdayRange;
     @track
     isValidDate = true;
+    @track
+    lstDateForLeave;
     isValidLeaveDate = true;
+
+    @api
+    get listDateForLeave() {
+        return this.lstDateForLeave;
+    }
+
     @wire(MessageContext)
     messageContext;
-    lstDateForLeave;
+
+    toDate(date) {
+        const year = date.slice(0, 4);
+        const month = date.slice(5, 7) - 1;
+        const day = date.slice(8, 10);
+        return new Date(year, month, day);
+    }
 
     // get start date from child component
     startDateChangeHandler(evt) {
@@ -52,6 +70,14 @@ export default class ShowAllCalendar extends LightningElement {
         return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
 
+    // Check if the loop date is the selected date when edit/ delete.
+    checkIfSelected(Id) {
+        if (this.dateNeedToBeUpdated.oldRecordId === Id) {
+            return true;
+        }
+        return false;
+    }
+
     // check if day2 > day1
     validDate = (startDate, endDate) => {
         return new Date(endDate) >= new Date(startDate);
@@ -64,7 +90,7 @@ export default class ShowAllCalendar extends LightningElement {
             message: 'End date must be greater than the Start date',
             variant: 'error'
         });
-        this.dispatchEvent(evt);
+        window.dispatchEvent(evt);
     }
 
     // open a window to show difference between start date and end date when the 'Calculate' button is clicked
@@ -101,30 +127,11 @@ export default class ShowAllCalendar extends LightningElement {
     }
 
     checkIfLeaveDateIsValid() {
-        let countInvalidCondition = 0;
-        if (!this.lstDateForLeave) {
-            // call APEX class
-            getDateForLeave().then((res) => {
-                let lstDateForLeave = JSON.parse(JSON.stringify(res));
-                lstDateForLeave.forEach((element) => {
-                    // get all start date in exist list
-                    const tmpStartDate = element.Start_Date__c;
-                    // get all end date in exist list
-                    const tmpEndDate = element.End_Date__c;
-                    // get all applicant Id in exist list
-                    const tmpApplicant = element.Applicant_ID__c;
-                    // generate every start date
-                    let dtStartDate = new Date(parseFloat(tmpStartDate.slice(0, 4)), parseFloat(tmpStartDate.slice(5, 7)) - 1, parseFloat(tmpStartDate.slice(8, 10)), 0, 0, 0, 0);
-                    // generate every end date
-                    let dtEndDate = new Date(parseFloat(tmpEndDate.slice(0, 4)), parseFloat(tmpEndDate.slice(5, 7)) - 1, parseFloat(tmpEndDate.slice(8, 10)), 0, 0, 0, 0);
-                    // Check 1. If current user = applicant 2. If so, check if duplicated 3. If duplicated, invalid
-                    if (currentUser !== tmpApplicant || !(this.endDate < dtStartDate || this.startDate > dtEndDate)) {
-                        countInvalidCondition++;
-                    }
-                });
-            });
-        } else {
-            this.lstDateForLeave.forEach((element) => {
+        // call APEX class
+        getDateForLeave().then((res) => {
+            let lstDateForLeave = JSON.parse(JSON.stringify(res));
+            let countInvalidCondition = 0;
+            lstDateForLeave.forEach((element) => {
                 // get all start date in exist list
                 const tmpStartDate = element.Start_Date__c;
                 // get all end date in exist list
@@ -135,17 +142,20 @@ export default class ShowAllCalendar extends LightningElement {
                 let dtStartDate = new Date(parseFloat(tmpStartDate.slice(0, 4)), parseFloat(tmpStartDate.slice(5, 7)) - 1, parseFloat(tmpStartDate.slice(8, 10)), 0, 0, 0, 0);
                 // generate every end date
                 let dtEndDate = new Date(parseFloat(tmpEndDate.slice(0, 4)), parseFloat(tmpEndDate.slice(5, 7)) - 1, parseFloat(tmpEndDate.slice(8, 10)), 0, 0, 0, 0);
-                // Check 1. If current user = applicant 2. If so, check if duplicated 3. If duplicated, invalid
-                if (currentUser !== tmpApplicant || !(this.endDate < dtStartDate || this.startDate > dtEndDate)) {
-                    countInvalidCondition++;
+                // if traverse to the selected date, jump over
+                if (!this.checkIfSelected(element.Id)) {
+                    // check 1. if user = applicant 2. if so, check if duplicated 3. if duplicated, invalid
+                    if (currentUser !== tmpApplicant || !(this.endDate < dtStartDate || this.startDate > dtEndDate)) {
+                        countInvalidCondition++;
+                    }
                 }
             });
-        }
-        if (countInvalidCondition !== 0) {
-            this.isValidLeaveDate = false;
-        } else if (countInvalidCondition === 0) {
-            this.isValidLeaveDate = true;
-        }
+            if (countInvalidCondition !== 0) {
+                this.isValidLeaveDate = false;
+            } else if (countInvalidCondition === 0) {
+                this.isValidLeaveDate = true;
+            }
+        });
     }
 
     renderedCallback() {
@@ -159,7 +169,7 @@ export default class ShowAllCalendar extends LightningElement {
             message: 'The selected date range must not duplicate the date selected before!',
             variant: 'error'
         });
-        this.dispatchEvent(evt);
+        window.dispatchEvent(evt);
     }
 
     // date formatter
@@ -203,7 +213,13 @@ export default class ShowAllCalendar extends LightningElement {
                         this.checkIfLeaveDateIsValid();
                         if (this.isValidLeaveDate) {
                             // call APEX method to insert leave date
-                            insertLeaveDate({ startDate: this.startDate, endDate: this.endDate, typeIndex: result })
+                            updateLeaveDate({
+                                oldRecordId: this.dateNeedToBeUpdated.oldRecordId,
+                                newTypeIndex: result,
+                                newStartDate: this.startDate,
+                                newEndDate: this.endDate,
+                                currentUerId: currentUser
+                            })
                                 .then((res) => {
                                     let dateForLeaveList = JSON.parse(JSON.stringify(res));
                                     let i = 0;
@@ -220,9 +236,10 @@ export default class ShowAllCalendar extends LightningElement {
                                     });
                                     this.lstDateForLeave = dateForLeaveList;
                                     const payload = {
-                                        list: dateForLeaveList
+                                        list: this.lstDateForLeave
                                     };
                                     publish(this.messageContext, For_Leave_Updated_CHANNEL, payload);
+                                    this.close(payload);
                                 })
                                 .catch((err) => {
                                     console.log(err);
