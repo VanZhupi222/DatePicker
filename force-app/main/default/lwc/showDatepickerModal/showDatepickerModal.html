@@ -1,15 +1,13 @@
 <template>
-    <lightning-card title="Datepicker (Adder)" icon-name="standard:key_dates">
-        <!--use showCalendar to be start date component-->
+    <lightning-modal-header label="Modify your leave date"></lightning-modal-header>
+    <lightning-modal-body class="modalBody">
         <span style="display: inline-block" class="startDate">
             <c-show-calendar onshowstartdate={startDateChangeHandler} date-to-end={endDate}></c-show-calendar>
         </span>
-        <!--use another showCalendar to be end date component-->
         <span style="display: inline-block" class="endDate">
             <c-show-calendar onshowenddate={endDateChangeHandler} date-to-start={startDate}></c-show-calendar>
         </span>
         <button type="submit" class="slds-button slds-button_brand slds-button_stretch calculateButton" onclick={handleCalculateButton}>Calculate</button>
         <button type="submit" class="slds-button slds-button_brand slds-button_stretch confirmButton" onclick={handleConfirmButton}>Confirm</button>
-        <button type="submit" class="slds-button slds-button_brand slds-button_stretch checkInButton" onclick={handleCheckInButton}>{checkIn}</button>
-    </lightning-card>
+    </lightning-modal-body>
 </template>

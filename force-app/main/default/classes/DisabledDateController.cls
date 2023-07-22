@@ -1,4 +1,7 @@
 public with sharing class DisabledDateController {
+    /**
+     * @description get disabled date from custom setting in salesforce
+     */
     @AuraEnabled(cacheable=true)
     public static List<Disabled_Date__c> getDisabledDate() {
         List<Disabled_Date__c> disabledDate = new List<Disabled_Date__c>();

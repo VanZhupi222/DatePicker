@@ -1,32 +1,30 @@
-.wholeDiv {
-    height: 25px;
-    margin: 20px;
-    margin-bottom: 150px;
-    width: 251.38px;
-    margin-left: 200px;
-}
-
 .lightningCard {
     height: 50px;
-    margin-top: 0px;
+    z-index: 1000;
 }
 
 .secondDiv {
     margin-top: -25px;
+    /* background-color: cornsilk; */
+    border-radius: 10px;
 }
 
 .inputBox {
-    width: 200px; 
-    margin-left: 30px;
+    width: 200px;
+    text-align: center;
+    border-color: gray;
 }
 
-.thirdDiv .inputBox:hover{
+.thirdDiv .inputBox:hover {
     cursor: pointer;
 }
 
-.slds-datepicker{
-    width: 400px; 
-    margin-top: 50px;
+.thirdDiv {
+    z-index: 200;
+}
+
+.slds-datepicker {
+    width: 400px;
 }
 
 .dayOfTheWeek {
@@ -36,6 +34,12 @@
 .classToday {
     background-color: rgb(0, 255, 229);
     border-radius: 10px;
+    cursor: pointer;
+}
+
+.classTodayClassWeekend {
+    background-color: rgb(0, 255, 229);
+    cursor: not-allowed;
 }
 
 .classPreviousMonth {
@@ -47,6 +51,7 @@
     color: #909699;
     background-color: rgb(134, 210, 134);
     border-radius: 0px;
+    cursor: not-allowed;
 }
 
 .classCurrentMonth {
@@ -58,17 +63,19 @@
     color: black;
     background-color: rgb(134, 210, 134);
     border-radius: 0px;
+    cursor: not-allowed;
 }
 
-.classNextMonth{
+.classNextMonth {
     color: #909699;
     border-radius: 10px;
 }
 
-.classNextMonthClassWeekend{
+.classNextMonthClassWeekend {
     color: #909699;
     background-color: rgb(134, 210, 134);
     border-radius: 0px;
+    cursor: not-allowed;
 }
 
 .classDateToBeSelected {
@@ -76,83 +83,51 @@
     border-radius: 10px;
 }
 
+.classDateToBeSelectedClassWeekend {
+    background-color: #f0fbff;
+    cursor: not-allowed;
+}
+
 .classHoliday {
     color: red;
     border-radius: 10px;
+    cursor: not-allowed;
+}
+
+.calendarTable .classHoliday:hover {
+    background-color: #f0fbff;
 }
 
 .classHolidayClassWeekend {
     color: red;
     background-color: rgb(134, 210, 134);
     border-radius: 0px;
+    cursor: not-allowed;
 }
 
-.classDisabledDate {
+:is(.classDisabledDate, .classDisabledDateClassWeekend) {
     background-color: #909699;
+    cursor: not-allowed;
 }
 
-.classDisabledDateClassWeekend {
-    background-color: #909699;
-}
-
-.calendarTable .classToday:hover {
-    cursor: pointer;
-}
-
-.calendarTable .classPreviousMonth:hover {
+:is(.classPreviousMonth:hover, .classCurrentMonth:hover, .classNextMonth:hover, .classDateToBeSelected:hover) {
     background-color: #f0fbff;
     cursor: pointer;
 }
 
-.calendarTable .classCurrentMonth:hover {
-    background-color: #f0fbff;
-    cursor: pointer;
+.resetButton {
+    margin-left: 27%;
 }
 
-.calendarTable .classNextMonth:hover {
-    background-color: #f0fbff;
-    cursor: pointer;
+.todayButton {
+    margin-left: 27%;
 }
 
-.calendarTable .classHoliday:hover {
-    background-color: #f0fbff;
-    cursor: not-allowed;
-}
-
-.calendarTable .classDateToBeSelected:hover {
-    background-color: #f0fbff;
-    cursor: pointer;
-}
-
-.calendarTable .classDisabledDate:hover {
-    cursor: not-allowed;
-}
-.calendarTable .classPreviousMonthClassWeekend:hover {
-    cursor: not-allowed;
-}
-.calendarTable .classCurrentMonthClassWeekend:hover {
-    cursor: not-allowed;
-}
-.calendarTable .classNextMonthClassWeekend:hover {
-    cursor: not-allowed;
-}
-.calendarTable .classHolidayClassWeekend:hover {
-    cursor: not-allowed;
-}
-.calendarTable .classDisabledDateClassWeekend:hover {
-    cursor: not-allowed;
-}
-
-.calendarTable .dateCell {
-    border-radius: 10px;
-}
-
-.calendarTable .classToday {
-    background-color: rgb(0, 255, 229);
-    border-radius: 10px;
-}
-
-.calendarTable .classPreviousMonth {
-    color: #909699;
-    border-radius: 10px;
+.backdrop {
+    position: fixed;
+    z-index: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }

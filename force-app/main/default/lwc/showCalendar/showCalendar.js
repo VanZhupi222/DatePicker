@@ -1,9 +1,16 @@
-import { api, LightningElement, track } from 'lwc';
+import { api, LightningElement, track, wire } from 'lwc';
 import getHolidayList from '@salesforce/apex/CNHolidayController.getHolidayList';
 import getDisabledDate from '@salesforce/apex/DisabledDateController.getDisabledDate';
+import getCNHoliday from '@salesforce/apex/CNHolidayFromSalesforce.getCNHoliday';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import Close_Calendar_Controller_CHANNEL from '@salesforce/messageChannel/Close_Calendar_Controller__c';
+import { MessageContext, subscribe } from 'lightning/messageService';
 
 export default class ShowCalendar extends LightningElement {
+    @track
+    TODAY_BUTTON = 'Today'
+    @track
+    RESET_BUTTON = 'Reset'
     @track
     currentMonth = 0;
     @track
@@ -15,19 +22,19 @@ export default class ShowCalendar extends LightningElement {
     @track
     showDate;
     @track
-    showMonth;
-    @track
     holiday;
     @track
-    iconLeft = '<<';
+    ICON_LEFT = '<<';
     @track
-    iconRight = '>>';
+    ICON_RIGHT = '>>';
     @track
-    prevMonthTitle = 'Previous Month';
+    PREV_MONTH_TITLE = 'Previous Month';
     @track
-    nextMonthTitle = 'Next Month';
+    NEXT_MONTH_TITLE = 'Next Month';
     @track
-    requiredIcon = '*';
+    REQUIRED_ICON = '*';
+    @track
+    backdrop = '';
     @track
     dayOfTheWeekCol = [
         { value: 'Sunday', label: 'Sun', index: 0 },
@@ -38,10 +45,13 @@ export default class ShowCalendar extends LightningElement {
         { value: 'Friday', label: 'Fri', index: 5 },
         { value: 'Saturday', label: 'Sat', index: 6 }
     ];
-    holidayYearArray = [];
-    holidayMonthArray = [];
-    holidayDateArray = [];
     arrHoliday = [];
+    arrCustomHoliday = [];
+    customHolidayName;
+    customHolidayStart;
+    customHolidayEnd;
+    customHoliday = {};
+    customHolidayLength;
     holidayLength;
     ready = false; // rendering controller
     endDate;
@@ -52,8 +62,21 @@ export default class ShowCalendar extends LightningElement {
     disabledDateArray = [];
     disabledDateLength;
     today;
-    dateToChose;
+    dateToChoose;
     dateTableClass = 'slds-col slds-size_1-of-7 slds-grid slds-grid_vertical slds-align_absolute-center slds-text-heading_small';
+    subscription = null;
+    needClose;
+    DATE_ERROR_MESSAGE = 'Please select a new date';
+
+    // connect with other component through LMS(Lightning Message Service) Channel
+    @wire(MessageContext)
+    messageContext;
+    subscribeToMessageChannel() {
+        this.subscription = subscribe(this.messageContext, Close_Calendar_Controller_CHANNEL, (message) => this.handleMessage(message));
+    }
+    handleMessage(message) {
+        this.needClose = message.toClose;
+    }
 
     // getter to return start date
     @api
@@ -73,7 +96,7 @@ export default class ShowCalendar extends LightningElement {
         this.endDate = value;
     }
 
-    // getter to return start date
+    // getter to return datepicker label
     @api
     get dateStartOrEnd() {
         if (this.startDate) {
@@ -82,6 +105,32 @@ export default class ShowCalendar extends LightningElement {
             return 'Start Date';
         }
         return 'Date Picker';
+    }
+
+    // getter to get options in drop down year window
+    get optionsYear() {
+        let lstOptionsYear = [];
+        for (let i = this.today.getFullYear() - 100; i < this.today.getFullYear() + 50; i++) {
+            if (i === this.currentYear) {
+                lstOptionsYear.push({ label: i, value: i, selected: true });
+            } else {
+                lstOptionsYear.push({ label: i, value: i, selected: false });
+            }
+        }
+        return lstOptionsYear;
+    }
+
+    // getter to get options in drop down year window
+    get optionsMonth() {
+        let lstOptionsMonth = [];
+        for (let i = 0; i < 12; i++) {
+            if (i === this.currentMonth) {
+                lstOptionsMonth.push({ label: this.monthName[i], value: i, selected: true });
+            } else {
+                lstOptionsMonth.push({ label: this.monthName[i], value: i, selected: false });
+            }
+        }
+        return lstOptionsMonth;
     }
 
     //to judge if it is a leap year
@@ -123,13 +172,13 @@ export default class ShowCalendar extends LightningElement {
 
     // date formatter
     formatDate(inputDate) {
-        const dateFormat = new Intl.DateTimeFormat({
+        const dateFormat = new Intl.DateTimeFormat('zh-cn', {
             year: 'numeric',
             month: 'numeric',
-            date: 'numeric'
+            day: 'numeric'
         });
-        const [{ value: month }, , { value: date }, , { value: year }] = dateFormat.formatToParts(inputDate);
-        let formatDate = `${year}-${month}-${date}`;
+        const [{ value: year }, , { value: month }, , { value: day }] = dateFormat.formatToParts(inputDate);
+        let formatDate = `${year}-${month}-${day}`;
         return formatDate;
     }
     
@@ -140,10 +189,8 @@ export default class ShowCalendar extends LightningElement {
         // get tail of last month and head of next month to fill in the blank of the calendar
         const { year: lastMonthYear, month: lastMonth, days: lastMonthDays } = this.getNextMonthOrLastMonthDays(this.currentYear, this.currentMonth, 'last');
         const { year: nextMonthYear, month: nextMonth } = this.getNextMonthOrLastMonthDays(this.currentYear, this.currentMonth, 'next');
-
         // what week day is the first date.
         const weekIndex = this.getWeekIndex(this.currentYear, this.currentMonth);
-
         // illustrate calendar
         let calendarTable = [];
         // current month date counter
@@ -170,37 +217,36 @@ export default class ShowCalendar extends LightningElement {
                     // to check if the day is today, if true change background color to 1,
                     // if false change font color to 2
                     let classChange = this.dayDiff(prevDate, new Date()) === 0 ? 'classToday' : 'classPreviousMonth';
-                    //let style = this.dayDiff(prevDate, new Date()) === 0 ? 'background-color: rgb(0, 255, 229)' : 'color: #909699';
-                    if (this.dateToChose) {
-                        classChange = this.dayDiff(prevDate, this.dateToChose) === 0 ? 'classDateToBeSelected' : this.dayDiff(prevDate, new Date()) === 0 ? 'classToday' : 'classPreviousMonth';
-                        // style =
-                        //     this.dayDiff(prevDate, this.dateToChose) === 0
-                        //         ? 'background-color: #f0fbff'
-                        //         : this.dayDiff(prevDate, new Date()) === 0
-                        //         ? 'background-color: rgb(0, 255, 229)'
-                        //         : 'color: #909699';
+                    if (this.dateToChoose) {
+                        classChange = this.dayDiff(prevDate, this.dateToChoose) === 0 ? 'classDateToBeSelected' : this.dayDiff(prevDate, new Date()) === 0 ? 'classToday' : 'classPreviousMonth';
                     }
                     let holidayName = this.dayDiff(prevDate, new Date()) === 0 ? 'today' : '';
                     // to check if the day is holiday, if true change font color to red
-                    for (let x = 0; x < this.holidayLength; x++) {
-                        if (this.currentYear === this.getHolidayYear()[x] && countP === this.getHolidayDate()[x] && lastMonth === this.getHolidayMonth()[x]) {
-                            classChange = 'classHoliday';
-                            //style = 'color: red';
-                            holidayName = this.holiday[x].holiday_cn;
-                            break;
+                    for (let x = 0; x < this.customHolidayLength; x++) {
+                        if(this.arrCustomHoliday[x]) {
+                            if (this.day2GreaterThan1(this.arrCustomHoliday[x].startDate, prevDate) && this.day2GreaterThan1(prevDate, this.arrCustomHoliday[x].endDate)) {
+                                classChange = 'classHoliday';
+                                holidayName = this.arrCustomHoliday[x].name;
+                                break;
+                            }
+                        }
+                        else {
+                            if (this.dayDiff(this.arrCustomHoliday[x].startDate, prevDate) === 0) {
+                                classChange = 'classHoliday';
+                                holidayName = this.arrCustomHoliday[x].name;
+                                break;
+                            }
                         }
                     }
                     // If this.endDate exist, date after endDate become grey(in Start Date table).
                     if (this.endDate) {
                         classChange = this.day2GreaterThan1(prevDate, this.endDate) ? classChange : 'classDisabledDate';
-                        //style = this.day2GreaterThan1(prevDate, this.endDate) ? style : 'background-color: #909699';
                         disabled = this.day2GreaterThan1(prevDate, this.endDate) ? false : true;
                     }
 
                     // If this.startDate exist, date before startDate become grey(in End Date table).
                     if (this.startDate) {
                         classChange = this.day2GreaterThan1(this.startDate, prevDate) ? classChange : 'classDisabledDate';
-                        //style = this.day2GreaterThan1(this.startDate, prevDate) ? style : 'background-color: #909699';
                         disabled = this.day2GreaterThan1(this.startDate, prevDate) ? false : true;
                     }
 
@@ -208,15 +254,12 @@ export default class ShowCalendar extends LightningElement {
                     for (let x = 0; x < this.disabledDateLength; x++) {
                         if (this.currentYear === this.disabledYearArray[x] && countP === this.disabledDateArray[x] && lastMonth === this.disabledMonthArray[x]) {
                             classChange = 'classDisabledDate';
-                            //style = 'background-color: #909699;border-radius: 0px';
                             break;
                         }
                     }
-
                     if (prevDate.getDay() === 0 || prevDate.getDay() === 6) {
                         classChange += 'ClassWeekend';
                     }
-
                     // push properties into itemList
                     itemList.push({
                         value: countP + '',
@@ -224,7 +267,6 @@ export default class ShowCalendar extends LightningElement {
                         label: countP + '',
                         index: countP + '',
                         status: 'prevMonth',
-                        //style: style,
                         holidayName: holidayName,
                         dateString: prevDate.toString(),
                         disabled: disabled,
@@ -242,55 +284,52 @@ export default class ShowCalendar extends LightningElement {
                 // to check if the day is today, if true change background color to 1,
                 // if false change font color to 2
                 let classChange = this.dayDiff(nextDate, new Date()) === 0 ? 'classToday' : 'classNextMonth';
-                //let style = this.dayDiff(nextDate, new Date()) === 0 ? 'background-color: rgb(0, 255, 229)' : 'color: #909699';
                 // If a date is selected, first check if the day is selected,
                 // then check if the day is today;
-                if (this.dateToChose) {
-                    classChange = this.dayDiff(nextDate, this.dateToChose) === 0 ? 'classDateToBeSelected' : this.dayDiff(nextDate, new Date()) === 0 ? 'classToday' : 'classNextMonth';
-                    // style =
-                    //     this.dayDiff(nextDate, this.dateToChose) === 0
-                    //         ? 'background-color: #f0fbff'
-                    //         : this.dayDiff(nextDate, new Date()) === 0
-                    //         ? 'background-color: rgb(0, 255, 229)'
-                    //         : 'color: #909699';
+                if (this.dateToChoose) {
+                    classChange = this.dayDiff(nextDate, this.dateToChoose) === 0 ? 'classDateToBeSelected' : this.dayDiff(nextDate, new Date()) === 0 ? 'classToday' : 'classNextMonth';
                 }
                 // set title of the day
                 let holidayName = this.dayDiff(nextDate, new Date()) === 0 ? 'today' : '';
                 // traverse the holidayArray to check if the day is holiday,
                 // if so change color to red;
-                for (let x = 0; x < this.holidayLength; x++) {
-                    if (this.currentYear === this.getHolidayYear()[x] && countN + 1 === this.getHolidayDate()[x] && nextMonth === this.getHolidayMonth()[x]) {
-                        classChange = 'classHoliday';
-                        //style = 'color: red';
-                        holidayName = this.holiday[x].holiday_cn;
-                        break;
+                for (let x = 0; x < this.customHolidayLength; x++) {
+                    if (this.arrCustomHoliday[x].endDate) {
+                        if (this.day2GreaterThan1(this.arrCustomHoliday[x].startDate, nextDate) && this.day2GreaterThan1(nextDate, this.arrCustomHoliday[x].endDate)) {
+                            classChange = 'classHoliday';
+                            holidayName = this.arrCustomHoliday[x].name;
+                            break;
+                        }
                     }
+                    else {
+                        if (this.dayDiff(this.arrCustomHoliday[x].startDate, nextDate) === 0) {
+                            classChange = 'classHoliday';
+                            holidayName = this.arrCustomHoliday[x].name;
+                            break;
+                        }
+                    }
+                    
                 }
                 // If this.endDate exist, date after endDate become grey(in Start Date table).
                 if (this.endDate) {
                     classChange = this.day2GreaterThan1(nextDate, this.endDate) ? classChange : 'classDisabledDate';
-                    //style = this.day2GreaterThan1(nextDate, this.endDate) ? style : 'background-color: #909699';
-                    disabled = this.day2GreaterThan1(nextDate, this.endDate) ? false : true;
+                    disabled    = this.day2GreaterThan1(nextDate, this.endDate) ? false : true;
                 }
                 // If this.startDate exist, date before startDate become grey(in End Date table).
                 if (this.startDate) {
                     classChange = this.day2GreaterThan1(this.startDate, nextDate) ? classChange : 'classDisabledDate';
-                    //style = this.day2GreaterThan1(this.startDate, nextDate) ? style : 'background-color: #909699';
-                    disabled = this.day2GreaterThan1(this.startDate, nextDate) ? false : true;
+                    disabled    = this.day2GreaterThan1(this.startDate, nextDate) ? false : true;
                 }
                 // Set date to be disabled by custom settings from APEX
                 for (let x = 0; x < this.disabledDateLength; x++) {
                     if (this.currentYear === this.disabledYearArray[x] && countN + 1 === this.disabledDateArray[x] && nextMonth === this.disabledMonthArray[x]) {
                         classChange = 'classDisabledDate';
-                        // style = 'background-color: #909699;border-radius: 0px';
                         break;
                     }
                 }
-
                 if (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
                     classChange += 'ClassWeekend';
                 }
-
                 // next month
                 if (count > currentMonthDays) {
                     countN++;
@@ -301,7 +340,6 @@ export default class ShowCalendar extends LightningElement {
                         label: countN + '',
                         index: countN + '',
                         status: 'nextMonth',
-                        //style: style,
                         holidayName: holidayName,
                         dateString: nextDate.toString(),
                         disabled: disabled,
@@ -314,51 +352,52 @@ export default class ShowCalendar extends LightningElement {
                     let date = new Date(this.currentYear, this.currentMonth, count, 0, 0, 0, 0);
                     // to check if the day is today, if true change background color to 1,
                     // if false change font color to 2
-                    classChange = this.dayDiff(nextDate, new Date()) === 0 ? 'classToday' : 'classCurrentMonth';
-                    //style = this.dayDiff(date, new Date()) === 0 ? 'background-color: rgb(0, 255, 229)' : '';
+                    classChange = this.dayDiff(date, new Date()) === 0 ? 'classToday' : 'classCurrentMonth';
                     // If a date is selected, first check if the day is selected,
                     // then check if the day is today;
-                    if (this.dateToChose) {
-                        classChange = this.dayDiff(date, this.dateToChose) === 0 ? 'classDateToBeSelected' : this.dayDiff(date, new Date()) === 0 ? 'classToday' : 'classCurrentMonth';
-                        //style = this.dayDiff(date, this.dateToChose) === 0 ? 'background-color: #f0fbff' : this.dayDiff(date, new Date()) === 0 ? 'background-color: rgb(0, 255, 229)' : '';
+                    if (this.dateToChoose) {
+                        classChange = this.dayDiff(date, this.dateToChoose) === 0 ? 'classDateToBeSelected' : this.dayDiff(date, new Date()) === 0 ? 'classToday' : 'classCurrentMonth';
                     }
                     // set title of the day
                     holidayName = this.dayDiff(date, new Date()) === 0 ? 'today' : '';
                     // traverse the holidayArray to check if the day is holiday,
                     // if so change color to red;
-                    for (let x = 0; x < this.holidayLength; x++) {
-                        if (this.currentYear === this.getHolidayYear()[x] && count === this.getHolidayDate()[x] && this.currentMonth === this.getHolidayMonth()[x]) {
-                            classChange = 'classHoliday';
-                            //style = 'color: red';
-                            holidayName = this.holiday[x].holiday_cn;
-                            break;
+                    for (let x = 0; x < this.customHolidayLength; x++) {
+                        if (this.arrCustomHoliday[x].endDate){
+                            if (this.day2GreaterThan1(this.arrCustomHoliday[x].startDate, date) && this.day2GreaterThan1(date, this.arrCustomHoliday[x].endDate)) {
+                                classChange = 'classHoliday';
+                                holidayName = this.arrCustomHoliday[x].name;
+                                break;
+                            }
+                        }
+                        else {
+                            if (this.dayDiff(this.arrCustomHoliday[x].startDate, date) === 0) {
+                                classChange = 'classHoliday';
+                                holidayName = this.arrCustomHoliday[x].name;
+                                break;
+                            }
                         }
                     }
                     // If this.endDate exist, date after endDate become grey(in Start Date table).
                     if (this.endDate) {
                         classChange = this.day2GreaterThan1(date, this.endDate) ? classChange : 'classDisabledDate';
-                        //style = this.day2GreaterThan1(date, this.endDate) ? style : 'background-color: #909699';
-                        disabled = this.day2GreaterThan1(date, this.endDate) ? false : true;
+                        disabled    = this.day2GreaterThan1(date, this.endDate) ? false : true;
                     }
                     // If this.startDate exist, date before startDate become grey(in End Date table).
                     if (this.startDate) {
                         classChange = this.day2GreaterThan1(this.startDate, date) ? classChange : 'classDisabledDate';
-                        //style = this.day2GreaterThan1(this.startDate, date) ? style : 'background-color: #909699';
-                        disabled = this.day2GreaterThan1(this.startDate, date) ? false : true;
+                        disabled    = this.day2GreaterThan1(this.startDate, date) ? false : true;
                     }
                     // Set date to be disabled by custom settings from APEX
                     for (let x = 0; x < this.disabledDateLength; x++) {
                         if (this.currentYear === this.disabledYearArray[x] && count === this.disabledDateArray[x] && this.currentMonth === this.disabledMonthArray[x]) {
                             classChange = 'classDisabledDate';
-                            //style = 'background-color: #909699;border-radius: 0px;';
                             break;
                         }
                     }
-
                     if (date.getDay() === 0 || date.getDay() === 6) {
                         classChange += 'ClassWeekend';
                     }
-
                     // push properties into itemList
                     itemList.push({
                         value: count + '',
@@ -366,7 +405,6 @@ export default class ShowCalendar extends LightningElement {
                         label: count + '',
                         index: count,
                         status: 'currentMonth',
-                        //style: style,
                         holidayName: holidayName,
                         dateString: date.toString(),
                         disabled: disabled,
@@ -388,8 +426,6 @@ export default class ShowCalendar extends LightningElement {
             });
         }
         // set show month
-        let monthIndex = this.currentMonth;
-        this.showMonth = this.monthName[monthIndex];
         this.outputDays = calendarTable;
     }
 
@@ -409,7 +445,8 @@ export default class ShowCalendar extends LightningElement {
 
     refreshCalendar() {
         this.outputDays = [];
-        this.useHolidayList();
+        //this.useHolidayList();
+        this.useCustomHolidayList();
         this.generateCalendar();
     }
 
@@ -418,9 +455,9 @@ export default class ShowCalendar extends LightningElement {
         this.currentMonth--;
         if (this.currentMonth < 0) {
             this.currentYear--;
-            this.currentMonth = 11;
-            this.ready = false;
+            this.currentMonth = 11; // December
         }
+        this.ready = false;
         this.refreshCalendar();
     }
 
@@ -438,8 +475,8 @@ export default class ShowCalendar extends LightningElement {
         if (this.currentMonth > 11) {
             this.currentYear++;
             this.currentMonth = 0;
-            this.ready = false;
         }
+        this.ready = false;
         this.refreshCalendar();
     }
 
@@ -475,16 +512,16 @@ export default class ShowCalendar extends LightningElement {
     // click input and display the datepicker
     inputClickHandler() {
         this.refreshCalendar();
-        this.template.querySelector('[name="datePicker"]').style.display = '';
+        this.openModal();
     }
 
     // show date when clicking the calendar grid
     datePickHandler(evt) {
         let tmpDate = new Date(evt.currentTarget.dataset.datestring);
-        this.dateToChose = tmpDate;
+        this.dateToChoose = tmpDate;
         // if this.endDate exist, set input box some words(Start Date table)
         if (this.endDate) {
-            this.showDate = this.day2GreaterThan1(tmpDate, this.endDate) ? this.formatDate(tmpDate) : 'Please select a new date';
+            this.showDate = this.day2GreaterThan1(tmpDate, this.endDate) ? this.formatDate(tmpDate) : this.DATE_ERROR_MESSAGE;
         }
         // set showDate in input box(Start Date table)
         else {
@@ -492,7 +529,7 @@ export default class ShowCalendar extends LightningElement {
         }
         // if this.startDate exist, set input box some words(End Date table)
         if (this.startDate) {
-            this.showDate = this.day2GreaterThan1(this.startDate, tmpDate) ? this.formatDate(tmpDate) : 'Please select a new date';
+            this.showDate = this.day2GreaterThan1(this.startDate, tmpDate) ? this.formatDate(tmpDate) : this.DATE_ERROR_MESSAGE;
         }
         // set showDate in input box(Start Date table)
         else {
@@ -518,30 +555,45 @@ export default class ShowCalendar extends LightningElement {
         for (let i = 0; i < this.disabledDateLength; i++) {
             if (this.dayDiff(tmpDate, this.disabledFullDateArray[i]) === 0) {
                 this.showErrorToast();
-                this.showDate = 'Please select a new date';
+                this.showDate = this.DATE_ERROR_MESSAGE;
             }
         }
         // traverse the arrHoliday to check if the selected day is holiday
         // if so, pop-up a toast error
-        for (let i = 0; i < this.holidayLength; i++) {
-            if (this.dayDiff(tmpDate, this.arrHoliday[i]) === 0) {
-                this.showErrorToast();
-                this.showDate = 'Please select a new date';
+        for (let i = 0; i < this.customHolidayLength; i++) {
+            if (this.arrCustomHoliday[i].endDate) {
+                if (this.day2GreaterThan1(this.arrCustomHoliday[i].startDate, tmpDate) && this.day2GreaterThan1(tmpDate, this.arrCustomHoliday[i].endDate)) {
+                    this.showErrorToast();
+                    this.showDate = this.DATE_ERROR_MESSAGE;
+                }
+            }
+            else {
+                if (this.dayDiff(this.arrCustomHoliday[i].startDate, tmpDate) === 0) {
+                    this.showErrorToast();
+                    this.showDate = this.DATE_ERROR_MESSAGE;
+                }
             }
         }
         // check if target date is weekend, if so, pop-up a toast error
         if (tmpDate.getDay() === 0 || tmpDate.getDay() === 6){
             this.showErrorToast();
-            this.showDate = 'Please select a new date';
+            this.showDate = this.DATE_ERROR_MESSAGE;
         }
         // close the calendar table
-        this.template.querySelector('[name="datePicker"]').style.display = 'none';
+        this.closeModal();
     }
 
     // refresh currentYear when select element from drop down year window
-    selectorChangeHandler(evt) {
+    yearSelectorChangeHandler(evt) {
         let tmpYear = evt.target.value;
         this.currentYear = parseFloat(tmpYear);
+        this.refreshCalendar();
+    }
+
+    // refresh currentYear when select element from drop down year window
+    monthSelectorChangeHandler(evt) {
+        let tmpMonth = evt.target.value;
+        this.currentMonth = parseFloat(tmpMonth);
         this.refreshCalendar();
     }
 
@@ -564,44 +616,7 @@ export default class ShowCalendar extends LightningElement {
             })
         );
         this.setBasicDate();
-        this.template.querySelector('[name="datePicker"]').style.display = 'none';
-    }
-
-    // getter to get options in drop down year window
-    get options() {
-        let lstOption = [];
-        for (let i = this.today.getFullYear() - 100; i < this.today.getFullYear() + 50; i++) {
-            if (i === this.currentYear) {
-                lstOption.push({ label: i, value: i, selected: true });
-            } else {
-                lstOption.push({ label: i, value: i, selected: false });
-            }
-        }
-        return lstOption;
-    }
-
-    // put holiday year in an array
-    getHolidayYear() {
-        for (let i = 0; i < this.holidayLength; i++) {
-            this.holidayYearArray[i] = this.holiday[i].holidayYear;
-        }
-        return this.holidayYearArray;
-    }
-
-    // put holiday month in an array
-    getHolidayMonth() {
-        for (let i = 0; i < this.holidayLength; i++) {
-            this.holidayMonthArray[i] = this.holiday[i].holidayMonth - 1;
-        }
-        return this.holidayMonthArray;
-    }
-
-    // put holiday date in an array
-    getHolidayDate() {
-        for (let i = 0; i < this.holidayLength; i++) {
-            this.holidayDateArray[i] = this.holiday[i].holidayDate;
-        }
-        return this.holidayDateArray;
+        this.closeModal();
     }
 
     // call APEX class to get holidays
@@ -611,9 +626,9 @@ export default class ShowCalendar extends LightningElement {
                 let holidayList = JSON.parse(JSON.stringify(res)).list;
                 this.holidayLength = holidayList.length;
                 holidayList.forEach((element) => {
-                    element.holidayYear = parseFloat(element.dateT.toString().slice(0, 4));
+                    element.holidayYear  = parseFloat(element.dateT.toString().slice(0, 4));
                     element.holidayMonth = parseFloat(element.dateT.toString().slice(4, 6));
-                    element.holidayDate = parseFloat(element.dateT.toString().slice(-2));
+                    element.holidayDate  = parseFloat(element.dateT.toString().slice(-2));
                     let holidayDay = new Date(element.holidayYear, element.holidayMonth - 1, element.holidayDate, 0, 0, 0, 0);
                     this.arrHoliday.push(holidayDay);
                 });
@@ -625,24 +640,63 @@ export default class ShowCalendar extends LightningElement {
             });
     }
 
+    useCustomHolidayList() {
+        getCNHoliday()
+        .then((res) => {
+            let wholeCustomHoliday = JSON.parse(JSON.stringify(res)).correctDate;
+            this.customHolidayLength = wholeCustomHoliday.length;
+            wholeCustomHoliday.forEach((element) => {
+                if(element.RecurrenceStartDate) {
+                    let holidayStartYear  = parseFloat(element.RecurrenceStartDate.slice(0, 4));
+                    let holidayStartMonth = parseFloat(element.RecurrenceStartDate.slice(5, 7));
+                    let holidayStartDay   = parseFloat(element.RecurrenceStartDate.slice(-2));
+                    let holidayStartDate  = new Date(holidayStartYear, holidayStartMonth - 1, holidayStartDay, 0, 0, 0, 0);
+                    this.customHolidayStart = holidayStartDate;
+                    if(element.RecurrenceEndDateOnly){
+                        let holidayEndYear  = parseFloat(element.RecurrenceEndDateOnly.slice(0, 4));
+                        let holidayEndMonth = parseFloat(element.RecurrenceEndDateOnly.slice(5, 7));
+                        let holidayEndDay   = parseFloat(element.RecurrenceEndDateOnly.slice(-2));
+                        let holidayEndDate  = new Date(holidayEndYear, holidayEndMonth - 1, holidayEndDay, 0, 0, 0, 0);
+                        this.customHolidayEnd = holidayEndDate;
+                    }
+                    this.customHolidayName = element.Name;
+                    this.customHoliday = {name: this.customHolidayName, startDate: this.customHolidayStart, endDate: this.customHolidayEnd};
+                }
+                else if(!element.RecurrenceStartDate) {
+                    let holidayYear  = parseFloat(element.ActivityDate.slice(0, 4));
+                    let holidayMonth = parseFloat(element.ActivityDate.slice(5, 7));
+                    let holidayDay   = parseFloat(element.ActivityDate.slice(-2));
+                    let holidayDate  = new Date(holidayYear, holidayMonth - 1, holidayDay, 0, 0, 0, 0);
+                    this.customHolidayName = element.Name;
+                    this.customHoliday = {name: this.customHolidayName, startDate: holidayDate, endDate: null};
+                    console.log(this.customHoliday);
+                }
+                this.arrCustomHoliday.push(this.customHoliday);
+            });
+        })
+        .catch((err) => {
+            console.log('getCNHoliday error: ' + err);
+        });
+    }
+
     useDisabledDateList() {
         getDisabledDate()
             .then((res) => {
                 let disabledDateList = JSON.parse(JSON.stringify(res));
                 disabledDateList.forEach((element) => {
                     // get disabled date data
-                    let disabledStartYear = element.Start_Date__c.slice(0, 4);
+                    let disabledStartYear  = element.Start_Date__c.slice(0, 4);
                     let disabledStartMonth = element.Start_Date__c.slice(5, 7) - 1;
-                    let disabledStartDay = element.Start_Date__c.slice(8, 10);
-                    let disabledEndYear = element.End_Date__c.slice(0, 4);
-                    let disabledEndMonth = element.End_Date__c.slice(5, 7) - 1;
-                    let disabledEndDay = element.End_Date__c.slice(8, 10);
+                    let disabledStartDay   = element.Start_Date__c.slice(8, 10);
+                    let disabledEndYear    = element.End_Date__c.slice(0, 4);
+                    let disabledEndMonth   = element.End_Date__c.slice(5, 7) - 1;
+                    let disabledEndDay     = element.End_Date__c.slice(8, 10);
                     // set disabled date
                     let disabledStartDate = new Date(disabledStartYear, disabledStartMonth, disabledStartDay, 0, 0, 0, 0);
-                    let disabledEndDate = new Date(disabledEndYear, disabledEndMonth, disabledEndDay, 0, 0, 0, 0);
+                    let disabledEndDate   = new Date(disabledEndYear, disabledEndMonth, disabledEndDay, 0, 0, 0, 0);
                     // to judge if input is correct, if so, return right answer, if not, return the other one.
                     element.disabledStartDate = disabledStartDate <= disabledEndDate ? disabledStartDate : disabledEndDate;
-                    element.disabledEndDate = disabledEndDate >= disabledStartDate ? disabledEndDate : disabledStartDate;
+                    element.disabledEndDate   = disabledEndDate >= disabledStartDate ? disabledEndDate : disabledStartDate;
                     // set loop controller
                     let disabledDayDiff = this.dayDiff(element.disabledStartDate, element.disabledEndDate);
                     if (element.disabledStartDate < element.disabledEndDate) {
@@ -679,18 +733,32 @@ export default class ShowCalendar extends LightningElement {
         this.dispatchEvent(evt);
     }
 
+    openModal() {
+        this.template.querySelector('[name="datePicker"]').style.display = '';
+        // when the datepicker is open, create a full-screen curtain, while clicking the curtain, close the datepicker
+        this.backdrop = 'backdrop';
+    }
+
+    closeModal() {
+        this.template.querySelector('[name="datePicker"]').style.display = 'none';
+        this.backdrop = '';
+    }
+
     renderedCallback() {
         // ready is rendering controller
         if (!this.ready) {
-            const yearSelector = this.template.querySelector('[name="yearSelector"]');
-            yearSelector.selectedIndex = [...yearSelector.options].findIndex((option) => option.value === this.currentYear + '');
+            const yearSelector  = this.template.querySelector('[name="yearSelector"]');
+            const monthSelector = this.template.querySelector('[name="monthSelector"]');
+            yearSelector.selectedIndex  = [...yearSelector.options].findIndex((option) => option.value === this.currentYear + '');
+            monthSelector.selectedIndex = [...yearSelector.options].findIndex((option) => option.index === this.currentMonth);
         }
         this.ready = true;
     }
 
     connectedCallback() {
         this.setBasicDate();
-        this.useHolidayList();
+        // this.useHolidayList();
+        this.useCustomHolidayList();
         this.showDate = this.showDate ? this.showDate : null;
         this.generateCalendar();
         this.useDisabledDateList();

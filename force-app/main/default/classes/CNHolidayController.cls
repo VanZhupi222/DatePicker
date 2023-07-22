@@ -1,9 +1,8 @@
 public with sharing class CNHolidayController {
     /**
-     * @param String strYear
+     * @param strYear
      * @return Map<String, Object> mapHoliday
      */
-    
     @AuraEnabled(cacheable=true)
     public static Map<String, Object> getHolidayList(String strYear) {
         Http http = new Http();

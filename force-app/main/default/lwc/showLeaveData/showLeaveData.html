@@ -1,36 +1,49 @@
 <template>
-    <table class="slds-table slds-table_cell-buffer slds-table_bordered" aria-labelledby="element-with-table-label other-element-with-table-label">
-        <thead>
-            <tr class="slds-line-height_reset">
-                <th class="" scope="col" for:each={dateForLeaveLabel} for:item="label" key={label.index}>
-                    <div class="slds-truncate" title={label.label}>{label.label}</div>
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr class="slds-hint-parent" for:each={lstDateForLeave} for:item="dateForLeave" key={dateForLeave.Start_Date__c}>
-                <td data-label={dateForLeave.Type__c}>
-                    <div class="slds-truncate" title={dateForLeave.Type__c}>{dateForLeave.Type__c}</div>
-                </td>
-                <td data-label={dateForLeave.Start_Date__c}>
-                    <div class="slds-truncate" title={dateForLeave.Start_Date__c}>{dateForLeave.Start_Date__c}</div>
-                </td>
-                <td data-label={dateForLeave.End_Date__c}>
-                    <div class="slds-truncate" title={dateForLeave.End_Date__c}>{dateForLeave.End_Date__c}</div>
-                </td>
-                <td data-label={dateForLeave.Actual_Range__c}>
-                    <div class="slds-truncate" title={dateForLeave.Actual_Range__c}>{dateForLeave.Actual_Range__c}</div>
-                </td>
-                <td data-label={dateForLeave.Workday_Range__c}>
-                    <div class="slds-truncate" title={dateForLeave.Workday_Range__c}>{dateForLeave.Workday_Range__c}</div>
-                </td>
-                <td data-label={dateForLeave.Date_of_Application__c}>
-                    <div class="slds-truncate" title={dateForLeave.Date_of_Application__c}>{dateForLeave.Date_of_Application__c}</div>
-                </td>
-                <td data-label={dateForLeave.Applicant__c}>
-                    <div class="slds-truncate" title={dateForLeave.Applicant__c}>{dateForLeave.Applicant__c}</div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <lightning-card title="Leave Date Details" icon-name="standard:form">
+        <table class="slds-table slds-table_cell-buffer slds-table_bordered" aria-labelledby="element-with-table-label other-element-with-table-label">
+            <thead>
+                <tr class="slds-line-height_reset">
+                    <th class="" scope="col" for:each={dateForLeaveLabel} for:item="label" key={label.index}>
+                        <div class="slds-truncate slds-align_absolute-center" title={label.label}>{label.label}</div>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="slds-hint-parent" for:each={lstDateForLeave} for:item="dateForLeave" key={dateForLeave.index}>
+                    <td data-label={dateForLeave.Type__c} data-id={dateForLeave.index}>
+                        <div class="slds-truncate slds-align_absolute-center" title={dateForLeave.Type__c}>{dateForLeave.Type__c}</div>
+                    </td>
+                    <td data-label={dateForLeave.Start_Date__c}>
+                        <div class="slds-truncate slds-align_absolute-center" title={dateForLeave.Start_Date__c}>{dateForLeave.Start_Date__c}</div>
+                    </td>
+                    <td data-label={dateForLeave.End_Date__c}>
+                        <div class="slds-truncate slds-align_absolute-center" title={dateForLeave.End_Date__c}>{dateForLeave.End_Date__c}</div>
+                    </td>
+                    <td data-label={dateForLeave.Actual_Range__c}>
+                        <div class="slds-truncate slds-align_absolute-center" title={dateForLeave.Actual_Range__c}>{dateForLeave.Actual_Range__c}</div>
+                    </td>
+                    <td data-label={dateForLeave.Workday_Range__c}>
+                        <div class="slds-truncate slds-align_absolute-center" title={dateForLeave.Workday_Range__c}>{dateForLeave.Workday_Range__c}</div>
+                    </td>
+                    <td data-label={dateForLeave.Date_of_Application__c}>
+                        <div class="slds-truncate slds-align_absolute-center" title={dateForLeave.Date_of_Application__c}>{dateForLeave.Date_of_Application__c}</div>
+                    </td>
+                    <td data-label={dateForLeave.Applicant__c}>
+                        <div class="slds-truncate slds-align_absolute-center" title={dateForLeave.Applicant__c}>{dateForLeave.Applicant__c}</div>
+                    </td>
+                    <td data-label="Operation">
+                        <div class="slds-truncate slds-align_absolute-center" title="Operation">
+                            <div role="button" style="display: inline-block" class={dateForLeave.classIfCurrentUser} onclick={handleEditButton} data-id={dateForLeave.index}>
+                                {dateForLeave.operationEdit}
+                            </div>
+                            <div style="display: inline-block">&nbsp;|&nbsp;</div>
+                            <div role="button" style="display: inline-block" class={dateForLeave.classIfCurrentUser} onclick={handleDeleteButton} data-id={dateForLeave.index}>
+                                {dateForLeave.operationDelete}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </lightning-card>
 </template>

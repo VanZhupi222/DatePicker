@@ -1,26 +1,15 @@
 .calculateButton {
-    position: relative;
-    left: 35%;
+    margin-left: 35%;
     background: white;
     color: dodgerblue;
     width: 75px;
 }
 
 .confirmButton {
-    left: 35%;
+    margin-right: 35%;
     background: white;
     color: dodgerblue;
     width: 75px;
-}
-
-.checkInButton {
-    position: fixed;
-    top: 25%;
-    right: 10%;
-    background: white;
-    color: dodgerblue;
-    width: 94px;
-    z-index: 100;
 }
 
 .startDate {
@@ -33,4 +22,10 @@
     margin-left: 10%;
     margin-right: 10%;
     width: 30%;
+}
+
+.modalBody {
+    max-height: 520px;
+    min-height: 300px;
+    height: 80%;
 }

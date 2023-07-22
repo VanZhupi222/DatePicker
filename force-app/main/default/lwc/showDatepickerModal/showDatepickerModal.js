@@ -1,21 +1,18 @@
-import { LightningElement, track, wire } from 'lwc';
+import LightningModal from 'lightning/modal';
+import { track, api, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import LightningAlert from 'lightning/alert';
-import insertLeaveDate from '@salesforce/apex/DatePickerController.insertLeaveDate';
-//import getDateForLeave from '@salesforce/apex/DatePickerController.getDateForLeave';
+import updateLeaveDate from '@salesforce/apex/DatePickerController.updateLeaveDate';
 import getDateForLeaveSpeUser from '@salesforce/apex/DatePickerController.getDateForLeaveSpeUser';
-import getIsCheckIn from '@salesforce/apex/AccountCheckinController.getIsCheckIn';
-import updateIsCheckIn from '@salesforce/apex/AccountCheckinController.updateIsCheckIn';
 import LightningConfirm from 'lightning/confirm';
 import showChooseTypeModal from 'c/showChooseTypeModal';
 import currentUser from '@salesforce/user/Id';
 import { publish, MessageContext } from 'lightning/messageService';
 import For_Leave_Updated_CHANNEL from '@salesforce/messageChannel/For_Leave_Updated__c';
-import Close_Calendar_Controller_CHANNEL from '@salesforce/messageChannel/Close_Calendar_Controller__c';
 
-export default class ShowAllCalendar extends LightningElement {
-    @track
-    checkIn = `Check In`;
+export default class ShowDatepickerModal extends LightningModal {
+    @api
+    dateNeedToBeUpdated = {};
     @track
     startDate;
     @track
@@ -26,14 +23,24 @@ export default class ShowAllCalendar extends LightningElement {
     workdayRange;
     @track
     isValidDate = true;
+    @track
+    lstDateForLeave;
     isValidLeaveDate = true;
+
+    @api
+    get listDateForLeave() {
+        return this.lstDateForLeave;
+    }
+
     @wire(MessageContext)
     messageContext;
-    @wire(MessageContext)
-    messageClose;
-    lstDateForLeave;
-    needClose = false;
-    isCheckIn;
+
+    toDate(date) {
+        const year  = date.slice(0, 4);
+        const month = date.slice(5, 7) - 1;
+        const day   = date.slice(8, 10);
+        return new Date(year, month, day);
+    }
 
     // get start date from child component
     startDateChangeHandler(evt) {
@@ -63,6 +70,14 @@ export default class ShowAllCalendar extends LightningElement {
         return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
 
+    // Check if the loop date is the selected date when edit/ delete.
+    checkIfSelected(Id) {
+        if (this.dateNeedToBeUpdated.oldRecordId === Id) {
+            return true;
+        }
+        return false;
+    }
+
     // check if day2 > day1
     validDate = (startDate, endDate) => {
         return new Date(endDate) >= new Date(startDate);
@@ -75,7 +90,7 @@ export default class ShowAllCalendar extends LightningElement {
             message: 'End date must be greater than the Start date',
             variant: 'error'
         });
-        this.dispatchEvent(evt);
+        window.dispatchEvent(evt);
     }
 
     // open a window to show difference between start date and end date when the 'Calculate' button is clicked
@@ -90,85 +105,9 @@ export default class ShowAllCalendar extends LightningElement {
         });
     }
 
-    async ifCheckIn() {
-        await getIsCheckIn({ userId: currentUser }).then((res) => {
-            this.isCheckIn = res;
-        })
-        .catch((err) => {
-            console.error(err);
-        });
-        console.log(`isCheckIn: ${this.isCheckIn}`);
-    }
-
-    async handleCheckInButton() {
-        const today = new Date();
-        this.ifCheckIn();
-        if (!this.isCheckIn) {
-            this.checkInOut = `Check In`;
-            const checkType = this.calculateCheckinType(today);
-            const boolIfConfirmed = await LightningConfirm.open({
-                message: `Please check the check-in date: ${this.formatDate(today)} and the check-in Type: ${checkType}`,
-                variant: `confirm`,
-                label: `Confirming...`,
-                theme: `warning`
-            });
-            if (boolIfConfirmed) {
-                console.log('112234')
-                updateIsCheckIn({ userId: currentUser, CheckInTime: today});
-                await LightningAlert.open({
-                    message: `Check-In Successfully!`,
-                    theme: `success` ,
-                    label: `Check-In`
-                });
-                this.isCheckIn = true;
-            }
-        }
-        else {
-            const evt = new ShowToastEvent({
-                title: 'Error',
-                message: `You have already checked in today`,
-                variant: 'error'
-            });
-            this.dispatchEvent(evt);
-        }
-    }
-
-    calculateCheckinType(inputDateTime) {
-        const TYPE_LATE_ARRIVAL = `Late Arrival`;
-        const TYPE_NORMAL = `Normal`; 
-        const today = new Date();
-        const morningStandardTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9, 0, 0);
-        if (morningStandardTime < inputDateTime) {
-            return TYPE_LATE_ARRIVAL;
-        }
-        else return TYPE_NORMAL;
-    }
-
-    calculateCheckoutType(inputDateTime) {
-        const TYPE_OVERTIME = `Overtime`;
-        const TYPE_NORMAL = `Normal`; 
-        const today = new Date();
-        // const checkinTime = inputDateTime.toLocaleTimeString()
-        const eveningStandardTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 17, 0, 0);
-        if (eveningStandardTime < inputDateTime) {
-            return TYPE_OVERTIME;
-        }
-        else return TYPE_NORMAL;
-    }
-
-    // pass param to showCalendar to close input window;
-    closeInputWindow() {
-        this.needClose = true;
-        const payload = {
-            toClose: this.needClose
-        };
-        publish(this.messageClose, Close_Calendar_Controller_CHANNEL, payload);
-        this.needClose = false;
-    }
-
     checkIfChangeIsValid() {
         // check if both start date and end date exist
-        if (this.validDate(this.startDate, this.endDate) === true) {
+        if (this.validDate(this.startDate, this.endDate)) {
             // call diff to calculate
             this.actualRange = this.diff(this.startDate, this.endDate) + 1;
             this.isValidDate = true;
@@ -188,61 +127,36 @@ export default class ShowAllCalendar extends LightningElement {
     }
 
     checkIfLeaveDateIsValid() {
-        let countInvalidCondition = 0;
-        if (!this.lstDateForLeave) {
-            // call APEX class
-            getDateForLeaveSpeUser({ userId: currentUser }).then((res) => {
-                let lstDateForLeave = JSON.parse(JSON.stringify(res));
-                lstDateForLeave.forEach((element) => {
-                    // get all start date in exist list
-                    const tmpStartDate = element.Start_Date__c;
-                    // get all end date in exist list
-                    const tmpEndDate = element.End_Date__c;
-                    // generate every start date
-                    let dtStartDate = new Date(parseFloat(tmpStartDate.slice(0, 4)), parseFloat(tmpStartDate.slice(5, 7)) - 1, parseFloat(tmpStartDate.slice(8, 10)), 0, 0, 0, 0);
-                    // generate every end date
-                    let dtEndDate = new Date(parseFloat(tmpEndDate.slice(0, 4)), parseFloat(tmpEndDate.slice(5, 7)) - 1, parseFloat(tmpEndDate.slice(8, 10)), 0, 0, 0, 0);
-                    // Check 1. If current user = applicant 2. If so, check if duplicated 3. If duplicated, invalid
-                    if ((!(this.endDate < dtStartDate || this.startDate > dtEndDate))) {
+        // call APEX class
+        getDateForLeaveSpeUser({userId: currentUser}).then((res) => {
+            let lstDateForLeave = JSON.parse(JSON.stringify(res));
+            let countInvalidCondition = 0;
+            lstDateForLeave.forEach((element) => {
+                // get all start date in exist list
+                const tmpStartDate = element.Start_Date__c;
+                // get all end date in exist list
+                const tmpEndDate = element.End_Date__c;
+                // generate every start date or end date
+                let dtStartDate = new Date(parseFloat(tmpStartDate.slice(0, 4)), parseFloat(tmpStartDate.slice(5, 7)) - 1, parseFloat(tmpStartDate.slice(8, 10)), 0, 0, 0, 0);
+                let dtEndDate = new Date(parseFloat(tmpEndDate.slice(0, 4)), parseFloat(tmpEndDate.slice(5, 7)) - 1, parseFloat(tmpEndDate.slice(8, 10)), 0, 0, 0, 0);
+                // if traverse to the selected date, jump over
+                if (!this.checkIfSelected(element.Id)) {
+                    // check 1. if user = applicant 2. if so, check if duplicated 3. if duplicated, invalid
+                    if (!(this.endDate < dtStartDate || this.startDate > dtEndDate)) {
                         countInvalidCondition++;
-                    }
-                    if (countInvalidCondition !== 0) {
-                        this.isValidLeaveDate = false;
-                    } else if (countInvalidCondition === 0) {
-                        this.isValidLeaveDate = true;
-                    }
-                });
-            });
-        } else {
-            this.lstDateForLeave.forEach((element) => {
-                if (element.classIfCurrentUser === 'currentUserClass') {
-                    // get all start date in exist list
-                    const tmpStartDate = element.Start_Date__c;
-                    // get all end date in exist list
-                    const tmpEndDate = element.End_Date__c;
-                    // get all applicant Id in exist list
-                    const tmpApplicant = element.Applicant_ID__c;
-                    // generate every start date
-                    let dtStartDate = new Date(parseFloat(tmpStartDate.slice(0, 4)), parseFloat(tmpStartDate.slice(5, 7)) - 1, parseFloat(tmpStartDate.slice(8, 10)), 0, 0, 0, 0);
-                    // generate every end date
-                    let dtEndDate = new Date(parseFloat(tmpEndDate.slice(0, 4)), parseFloat(tmpEndDate.slice(5, 7)) - 1, parseFloat(tmpEndDate.slice(8, 10)), 0, 0, 0, 0);
-                    // Check 1. If current user = applicant 2. If so, check if duplicated 3. If duplicated, invalid
-                    if (currentUser !== tmpApplicant || !(this.endDate < dtStartDate || this.startDate > dtEndDate)) {
-                        countInvalidCondition++;
-                    }
-                    if (countInvalidCondition !== 0) {
-                        this.isValidLeaveDate = false;
-                    } else if (countInvalidCondition === 0) {
-                        this.isValidLeaveDate = true;
                     }
                 }
             });
-        }
+            if (countInvalidCondition !== 0) {
+                this.isValidLeaveDate = false;
+            } else if (countInvalidCondition === 0) {
+                this.isValidLeaveDate = true;
+            }
+        });
     }
 
     renderedCallback() {
         this.checkIfLeaveDateIsValid();
-        this.ifCheckIn();
     }
 
     // toast message if it is called
@@ -252,7 +166,7 @@ export default class ShowAllCalendar extends LightningElement {
             message: 'The selected date range must not duplicate the date selected before!',
             variant: 'error'
         });
-        this.dispatchEvent(evt);
+        window.dispatchEvent(evt);
     }
 
     // date formatter
@@ -296,7 +210,13 @@ export default class ShowAllCalendar extends LightningElement {
                         this.checkIfLeaveDateIsValid();
                         if (this.isValidLeaveDate) {
                             // call APEX method to insert leave date
-                            insertLeaveDate({ startDate: this.startDate, endDate: this.endDate, typeIndex: result })
+                            updateLeaveDate({
+                                oldRecordId: this.dateNeedToBeUpdated.oldRecordId,
+                                newTypeIndex: result,
+                                newStartDate: this.startDate,
+                                newEndDate: this.endDate,
+                                currentUerId: currentUser
+                            })
                                 .then((res) => {
                                     let dateForLeaveList = JSON.parse(JSON.stringify(res));
                                     let i = 0;
@@ -311,11 +231,12 @@ export default class ShowAllCalendar extends LightningElement {
                                         }
                                         i++;
                                     });
+                                    this.lstDateForLeave = dateForLeaveList;
                                     const payload = {
-                                        list: dateForLeaveList
+                                        list: this.lstDateForLeave
                                     };
                                     publish(this.messageContext, For_Leave_Updated_CHANNEL, payload);
-                                    this.lstDateForLeave = dateForLeaveList;
+                                    this.close(payload);
                                 })
                                 .catch((err) => {
                                     console.log(err);
